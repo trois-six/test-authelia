@@ -38,6 +38,7 @@ docker image inspect localhost/haproxy-ingress:latest >/dev/null 2>&1
 if [ $? -eq 1 ]; then
     git clone https://github.com/jcmoraisjr/haproxy-ingress.git
     cd haproxy-ingress
+    git checkout 42034000bc7e4516696fc7f107b6a2d9b82588a3
     make
     make image
     cd ..
