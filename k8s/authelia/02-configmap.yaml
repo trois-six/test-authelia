@@ -1,0 +1,65 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-config
+  namespace: authelia
+data:
+  configuration.yml: |-
+    port: 8080
+    log_level: debug
+    default_redirection_url: http://traefik.traefik.me
+    jwt_secret: a_very_important_secret
+    totp:
+      issuer: traefik.me
+      period: 30
+      skew: 1
+    authentication_backend:
+      file:
+        path: /config/users_database.yml
+    access_control:
+      default_policy: one_factor
+    session:
+      name: authelia_session
+      secret: insecure_session_secret
+      expiration: 1h
+      inactivity: 5m
+      remember_me_duration: 1M
+      domain: traefik.me
+      redis:
+        host: redis
+        port: 6379
+    regulation:
+      max_retries: 3
+      find_time: 2m
+      ban_time: 5m
+    storage:
+      mysql:
+        host: mariadb
+        port: 3306
+        database: authelia
+        username: admin
+        password: password
+    notifier:
+      smtp:
+        host: mailcatcher
+        port: 1025
+        sender: admin@traefik.me
+        disable_require_tls: true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-users
+  namespace: authelia
+data:
+  users_database.yml: |-
+    users:
+      authelia:
+        displayname: "Authelia User"
+        password: "$6$rounds=50000$BpLnfgDsc2WD8F2q$Zis.ixdg9s/UOJYrs56b5QEZFiZECu0qZVNsIYxBaNJ7ucIL.nlxVCT5tqh8KHG8X4tlwCFm5r6NTOZZ5qRFN/" # Password is 'authelia'
+        email: authelia@authelia.com
+        groups:
+          - admins
+          - dev

@@ -1,0 +1,144 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-traefik
+  namespace: app
+spec:
+  ingressClassName: traefik-lb
+  rules:
+    - host: traefik.traefik.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-v1
+                port:
+                  number: 80
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: authelia
+  namespace: app
+spec:
+  forwardAuth:
+    address: http://authelia.authelia/api/verify?rd=https://authelia.traefik.me
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: app-traefik-secured
+  namespace: app
+spec:
+  routes:
+    - kind: Rule
+      match: Host(`traefik-secured.traefik.me`)
+      middlewares:
+      - name: authelia
+        namespace: app
+      services:
+      - name: app-v1
+        port: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-nginx
+  namespace: app
+spec:
+  ingressClassName: nginx-k8s
+  rules:
+    - host: nginx.traefik.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-v1
+                port:
+                  number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-nginx-secured
+  namespace: app
+  annotations:
+    kubernetes.io/ingress.allow-http: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/verify"
+    nginx.ingress.kubernetes.io/auth-signin: "https://authelia.traefik.me"
+spec:
+  ingressClassName: nginx-k8s
+  rules:
+    - host: nginx-secured.traefik.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-v1
+                port:
+                  number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-haproxy
+  namespace: app
+  annotations:
+    # kubernetes.io/ingress.class: haproxy
+    ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: haproxy.traefik.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-v1
+                port:
+                  number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-haproxy-secured
+  namespace: app
+  annotations:
+    # kubernetes.io/ingress.class: haproxy
+    ingress.kubernetes.io/ssl-redirect: "false"
+    ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/verify"
+    ingress.kubernetes.io/auth-signin: "https://authelia.traefik.me/?rd=https://haproxy-secured.traefik.me:10443"
+    ingress.kubernetes.io/headers: |
+      X-Forwarded-Proto: https
+      X-Forwarded-Host: %[req.hdr(Host)]
+      X-Forwarded-Port: %[dst_port]
+      X-Forwarded-Uri: %[path]%[var(req.questionmark)]%[query]
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: haproxy-secured.traefik.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-v1
+                port:
+                  number: 80
